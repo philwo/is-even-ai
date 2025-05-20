@@ -7,102 +7,110 @@ import (
 )
 
 var (
-	globalOpenAiInstance *IsEvenAiOpenAi
+	globalGeminiInstance *IsEvenAiGemini // Changed from globalOpenAiInstance
 	globalMu             sync.Mutex
 	apiKeyIsSet          bool
 )
 
-// SetAPIKey configures the global OpenAI client instance with the provided API key.
+// SetAPIKey configures the global Gemini client instance with the provided API key.
 // It must be called before using the convenience functions.
-// Additional OpenAIChatOptions can be provided to customize model, temperature, etc.
-func SetAPIKey(apiKey string, chatOpts ...OpenAIChatOptions) error {
+// Additional GeminiModelOptions can be provided to customize model, temperature, etc.
+func SetAPIKey(apiKey string, modelOpts ...GeminiModelOptions) error {
 	globalMu.Lock()
 	defer globalMu.Unlock()
 
 	if apiKey == "" {
 		apiKeyIsSet = false
-		// Clear instance if API key is unset, or handle as error
-		globalOpenAiInstance = nil
+		if globalGeminiInstance != nil {
+			globalGeminiInstance.Close() // Clean up existing client
+		}
+		globalGeminiInstance = nil
 		return errors.New("API key cannot be empty")
 	}
 
-	clientOptions := OpenAIClientOptions{APIKey: apiKey}
+	clientOptions := GeminiClientOptions{APIKey: apiKey}
 
-	var co OpenAIChatOptions
-	if len(chatOpts) > 0 {
-		co = chatOpts[0]
+	var mo GeminiModelOptions
+	if len(modelOpts) > 0 {
+		mo = modelOpts[0]
 	}
-	// Defaults for model and temperature are set in NewIsEvenAiOpenAi if not provided here
+	// Defaults for model and temperature are set in NewIsEvenAiGemini if not provided here
 
-	instance, err := NewIsEvenAiOpenAi(clientOptions, co)
+	instance, err := NewIsEvenAiGemini(clientOptions, mo)
 	if err != nil {
 		apiKeyIsSet = false
-		globalOpenAiInstance = nil // Ensure instance is nil on error
-		return fmt.Errorf("failed to initialize global IsEvenAiOpenAi instance: %w", err)
+		if globalGeminiInstance != nil {
+			globalGeminiInstance.Close()
+		}
+		globalGeminiInstance = nil // Ensure instance is nil on error
+		return fmt.Errorf("failed to initialize global IsEvenAiGemini instance: %w", err)
 	}
-	globalOpenAiInstance = instance
+	if globalGeminiInstance != nil { // Close previous instance if any
+		globalGeminiInstance.Close()
+	}
+	globalGeminiInstance = instance
 	apiKeyIsSet = true
 	return nil
 }
 
-func getGlobalOpenAiInstance() (*IsEvenAiOpenAi, error) {
+func getGlobalGeminiInstance() (*IsEvenAiGemini, error) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
-	if !apiKeyIsSet || globalOpenAiInstance == nil {
-		return nil, errors.New("OpenAI API key not set or instance not initialized. Call SetAPIKey() first.")
+	if !apiKeyIsSet || globalGeminiInstance == nil {
+		return nil, errors.New("Gemini API key not set or instance not initialized. Call SetAPIKey() first.")
 	}
-	return globalOpenAiInstance, nil
+	return globalGeminiInstance, nil
 }
 
-// IsEven checks if n is even using the global OpenAI instance.
+// IsEven checks if n is even using the global Gemini instance.
 // Returns *bool (true, false, or nil for undefined) and an error if the operation fails.
 func IsEven(n int) (*bool, error) {
-	client, err := getGlobalOpenAiInstance()
+	client, err := getGlobalGeminiInstance()
 	if err != nil {
 		return nil, err
 	}
 	return client.IsEven(n)
 }
 
-// IsOdd checks if n is odd using the global OpenAI instance.
+// IsOdd checks if n is odd using the global Gemini instance.
 func IsOdd(n int) (*bool, error) {
-	client, err := getGlobalOpenAiInstance()
+	client, err := getGlobalGeminiInstance()
 	if err != nil {
 		return nil, err
 	}
 	return client.IsOdd(n)
 }
 
-// AreEqual checks if a and b are equal using the global OpenAI instance.
+// AreEqual checks if a and b are equal using the global Gemini instance.
 func AreEqual(a, b int) (*bool, error) {
-	client, err := getGlobalOpenAiInstance()
+	client, err := getGlobalGeminiInstance()
 	if err != nil {
 		return nil, err
 	}
 	return client.AreEqual(a, b)
 }
 
-// AreNotEqual checks if a and b are not equal using the global OpenAI instance.
+// AreNotEqual checks if a and b are not equal using the global Gemini instance.
 func AreNotEqual(a, b int) (*bool, error) {
-	client, err := getGlobalOpenAiInstance()
+	client, err := getGlobalGeminiInstance()
 	if err != nil {
 		return nil, err
 	}
 	return client.AreNotEqual(a, b)
 }
 
-// IsGreaterThan checks if a is greater than b using the global OpenAI instance.
+// IsGreaterThan checks if a is greater than b using the global Gemini instance.
 func IsGreaterThan(a, b int) (*bool, error) {
-	client, err := getGlobalOpenAiInstance()
+	client, err := getGlobalGeminiInstance()
 	if err != nil {
 		return nil, err
 	}
 	return client.IsGreaterThan(a, b)
 }
 
-// IsLessThan checks if a is less than b using the global OpenAI instance.
+// IsLessThan checks if a is less than b using the global Gemini instance.
 func IsLessThan(a, b int) (*bool, error) {
-	client, err := getGlobalOpenAiInstance()
+	client, err := getGlobalGeminiInstance()
 	if err != nil {
 		return nil, err
 	}

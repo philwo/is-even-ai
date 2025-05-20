@@ -1,96 +1,121 @@
-# is-even-ai
+# is-even-ai-gemini (Go Version)
 
-[![NPM Version](https://img.shields.io/npm/v/is-even-ai.svg?style=flat)](https://www.npmjs.com/package/is-even-ai)
-[![NPM License](https://img.shields.io/npm/l/is-even-ai.svg?style=flat)](https://github.com/Calvin-LL/is-even-ai/blob/main/LICENSE)
-[![NPM Downloads](https://img.shields.io/npm/dt/is-even-ai.svg?style=flat)](https://www.npmjs.com/package/is-even-ai)
+[![Go Reference](https://pkg.go.dev/badge/github.com/philwo/is-even-ai.svg)](https://pkg.go.dev/github.com/philwo/is-even-ai)
+[![LICENSE](https://img.shields.io/github/license/philwo/is-even-ai.svg?style=flat)](https://github.com/philwo/is-even-ai/blob/main/LICENSE)
 
-Check if a number is even using the power of ✨AI✨.
 
-Uses OpenAI's GPT-3.5-turbo model under the hood to determine if a number is even.
+Check if a number is even using the power of ✨AI✨ with Google Gemini.
 
-For all those who want to use AI in their product but don't know how.
+Uses Google's Gemini AI models (defaulting to `gemini-2.0-flash-lite`) under the hood to determine if a number is even, odd, equal, etc.
 
-Inspired by the famous [`is-even`](https://www.npmjs.com/package/is-even) npm package and [this tweet](https://twitter.com/erenbali/status/1766602689863950658).
+For all those who want to use AI in their Go product but don't know how.
+
+Inspired by the famous [`is-even`](https://www.npmjs.com/package/is-even) npm package and related AI adaptations. This is a Go adaptation.
 
 ## Installation
 
-[This package is on npm.](https://www.npmjs.com/package/is-even-ai)
-
 ```sh
-npm install is-even-ai
-```
+go get [github.com/philwo/is-even-ai](https://github.com/philwo/is-even-ai)
 
 ## Usage
 
-```ts
-import {
-  areEqual,
-  areNotEqual,
-  isEven,
-  isGreaterThan,
-  isLessThan,
-  isOdd,
-  setApiKey,
-} from "is-even-ai";
+First, ensure you have a Gemini API key. You can set it as an environment variable `GEMINI_API_KEY`.
 
-// won't need this if you have OPENAI_API_KEY in your environment
-setApiKey("YOUR_API_KEY");
+### Convenience Functions
 
-console.log(await isEven(2)); // true
-console.log(await isEven(3)); // false
-console.log(await isOdd(4)); // false
-console.log(await isOdd(5)); // true
-console.log(await areEqual(6, 6)); // true
-console.log(await areEqual(6, 7)); // false
-console.log(await areNotEqual(6, 7)); // true
-console.log(await areNotEqual(7, 7)); // false
-console.log(await isGreaterThan(8, 7)); // true
-console.log(await isGreaterThan(7, 8)); // false
-console.log(await isLessThan(9, 8)); // false
-console.log(await isLessThan(8, 9)); // true
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+
+	isevenai "[github.com/philwo/is-even-ai](https://github.com/philwo/is-even-ai)"
+)
+
+func main() {
+	// Set API Key (reads from GEMINI_API_KEY environment variable in this example)
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		log.Fatal("Error: GEMINI_API_KEY environment variable not set.")
+	}
+	err := isevenai.SetAPIKey(apiKey)
+	if err != nil {
+		log.Fatalf("Error setting API key: %v", err)
+	}
+
+	fmt.Println(isevenai.IsEven(2))    // &true, <nil>
+	fmt.Println(isevenai.IsEven(3))    // &false, <nil>
+	fmt.Println(isevenai.IsOdd(4))     // &false, <nil>
+	fmt.Println(isevenai.IsOdd(5))     // &true, <nil>
+	fmt.Println(isevenai.AreEqual(6, 6)) // &true, <nil>
+	// ... and so on for AreNotEqual, IsGreaterThan, IsLessThan
+}
 ```
 
-for more advance usage like changing which model to use and setting the temperature, use `IsEvenAiOpenAi` instead
+### Direct Instance Usage
 
-```ts
-import { IsEvenAiOpenAi } from "is-even-ai";
+For more advanced usage, like changing which model to use or setting the temperature, use `IsEvenAiGemini` directly.
 
-const isEvenAiOpenAi = new IsEvenAiOpenAi(
-  {
-    // won't need this if you have OPENAI_API_KEY in your environment
-    apiKey: "YOUR_API_KEY",
-  },
-  {
-    model: "gpt-3.5-turbo",
-    temperature: 0,
-  }
-);
+```go
+package main
 
-console.log(await isEvenAiOpenAi.isEven(2)); // true
-console.log(await isEvenAiOpenAi.isEven(3)); // false
-console.log(await isEvenAiOpenAi.isOdd(4)); // false
-console.log(await isEvenAiOpenAi.isOdd(5)); // true
-console.log(await isEvenAiOpenAi.areEqual(6, 6)); // true
-console.log(await isEvenAiOpenAi.areEqual(6, 7)); // false
-console.log(await isEvenAiOpenAi.areNotEqual(6, 7)); // true
-console.log(await isEvenAiOpenAi.areNotEqual(7, 7)); // false
-console.log(await isEvenAiOpenAi.isGreaterThan(8, 7)); // true
-console.log(await isEvenAiOpenAi.isGreaterThan(7, 8)); // false
-console.log(await isEvenAiOpenAi.isLessThan(8, 9)); // true
-console.log(await isEvenAiOpenAi.isLessThan(9, 8)); // false
+import (
+	"fmt"
+	"log"
+	"os"
+
+	isevenai "[github.com/philwo/is-even-ai](https://github.com/philwo/is-even-ai)"
+)
+
+func main() {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		log.Fatal("Error: GEMINI_API_KEY environment variable not set.")
+	}
+
+	clientOpts := isevenai.GeminiClientOptions{
+		APIKey: apiKey,
+	}
+
+	// Optional: Customize model and temperature
+	// var temp float32 = 0.5
+	// modelOpts := isevenai.GeminiModelOptions{
+	// 	Model:       "gemini-pro", // Example: use gemini-pro
+	// 	Temperature: &temp,
+	// }
+	// geminiAI, err := isevenai.NewIsEvenAiGemini(clientOpts, modelOpts)
+
+	geminiAI, err := isevenai.NewIsEvenAiGemini(clientOpts) // Uses gemini-2.0-flash-lite by default
+	if err != nil {
+		log.Fatalf("Failed to create IsEvenAiGemini instance: %v", err)
+	}
+	defer geminiAI.Close() // Important to close the client
+
+	result, err := geminiAI.IsEven(2)
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else if result != nil {
+		fmt.Printf("Is 2 even? %t\n", *result) // Is 2 even? true
+	} else {
+		fmt.Println("Is 2 even? Undefined")
+	}
+	// ... other method calls
+}
 ```
 
 ## Supported AI platforms
 
-Feel free to make a PR to add more AI platforms.
-
-- [x] [OpenAI](https://openai.com) via `IsEvenAiOpenAi`
+- [x] Google Gemini via `IsEvenAiGemini` (using `gemini-2.0-flash-lite` by default)
 
 ## Supported methods
 
-- `isEven(n: number)`
-- `isOdd(n: number)`
-- `areEqual(a: number, b: number)`
-- `areNotEqual(a: number, b: number)`
-- `isGreaterThan(a: number, b: number)`
-- `isLessThan(a: number, b: number)`
+The following methods return `(*bool, error)`. The `*bool` can be true, false, or nil (if the AI's response is undefined).
+
+- `IsEven(n int)`
+- `IsOdd(n int)`
+- `AreEqual(a int, b int)`
+- `AreNotEqual(a int, b int)`
+- `IsGreaterThan(a int, b int)`
+- `IsLessThan(a int, b int)`

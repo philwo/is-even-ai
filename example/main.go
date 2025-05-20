@@ -9,15 +9,16 @@ import (
 )
 
 func main() {
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey := os.Getenv("GEMINI_API_KEY") // Changed from OPENAI_API_KEY
 	if apiKey == "" {
-		log.Fatal("Error: OPENAI_API_KEY environment variable not set.")
+		log.Fatal("Error: GEMINI_API_KEY environment variable not set.")
 	}
 
 	// Set the API key for the global instance
-	// Optionally, pass custom chat options:
-	// customChatOpts := isevenai.OpenAIChatOptions{Model: "gpt-4", Temperature: 0.1}
-	// err := isevenai.SetAPIKey(apiKey, customChatOpts)
+	// Optionally, pass custom model options:
+	// var temp float32 = 0.1
+	// customModelOpts := isevenai.GeminiModelOptions{Model: "gemini-pro", Temperature: &temp}
+	// err := isevenai.SetAPIKey(apiKey, customModelOpts)
 	err := isevenai.SetAPIKey(apiKey)
 	if err != nil {
 		log.Fatalf("Error setting API key: %v", err)
@@ -65,11 +66,17 @@ func main() {
 	// --- Alternatively, creating an instance directly ---
 	// This is useful if you don't want to use the global instance or need multiple instances.
 	fmt.Println("\nUsing a direct instance:")
-	clientOptions := isevenai.OpenAIClientOptions{APIKey: apiKey}
-	myAiInstance, err := isevenai.NewIsEvenAiOpenAi(clientOptions)
+	clientOptions := isevenai.GeminiClientOptions{APIKey: apiKey}
+	// Default model is gemini-2.0-flash-lite, temp 0.
+	// To customize:
+	// var temp float32 = 0.2
+	// modelOpts := isevenai.GeminiModelOptions{Model: "gemini-pro", Temperature: &temp}
+	// myAiInstance, err := isevenai.NewIsEvenAiGemini(clientOptions, modelOpts)
+	myAiInstance, err := isevenai.NewIsEvenAiGemini(clientOptions)
 	if err != nil {
-		log.Fatalf("Error creating direct IsEvenAiOpenAi instance: %v", err)
+		log.Fatalf("Error creating direct IsEvenAiGemini instance: %v", err)
 	}
+	defer myAiInstance.Close() // Close the client when done
 
 	isNumGreaterThan, err := myAiInstance.IsGreaterThan(100, 50)
 	if err != nil {
