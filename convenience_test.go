@@ -14,7 +14,6 @@ import (
 func resetGlobalStateAndClose() {
 	globalMu.Lock()
 	if globalGeminiInstance != nil {
-		// Consider logging an error from Close() if it occurs during cleanup
 		_ = globalGeminiInstance.Close() // Best effort close
 		globalGeminiInstance = nil
 	}
@@ -39,7 +38,7 @@ func checkConvenienceResult(t *testing.T, val *bool, err error, expected bool, f
 }
 
 func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
-	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
+	t.Cleanup(resetGlobalStateAndClose)
 
 	originalApiKey := os.Getenv("GEMINI_API_KEY")
 	apiKeyForTest := "test-api-key-from-setapikey-gemini"
@@ -57,16 +56,10 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 	}
 
 	t.Run("WithKeyPassedToSetAPIKey_Gemini", func(t *testing.T) {
-		// resetGlobalStateAndClose() // Already handled by t.Cleanup at parent level, or can be specific if sub-test manipulates state uniquely
-		// For subtests, if they independently manipulate the global state and need reset before *other subtests*,
-		// then having reset here is also fine. Or ensure parent cleanup is sufficient.
-		// Let's keep it simple: the parent test's Cleanup should cover this.
-		// If a sub-test fails and SetAPIKey was called, parent cleanup handles it.
-
 		if originalApiKey != "" {
 			currentEnvKey := os.Getenv("GEMINI_API_KEY")
-			_ = os.Unsetenv("GEMINI_API_KEY")                                 // Checked error
-			defer func() { _ = os.Setenv("GEMINI_API_KEY", currentEnvKey) }() // Checked error
+			_ = os.Unsetenv("GEMINI_API_KEY")
+			defer func() { _ = os.Setenv("GEMINI_API_KEY", currentEnvKey) }()
 		}
 
 		err := SetAPIKey(apiKeyForTest)
@@ -85,13 +78,11 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 
 		resBool, errBool := IsEven(2)
 		checkConvenienceResult(t, resBool, errBool, true, "IsEven", 2)
-		// resetGlobalStateAndClose() // Let t.Cleanup handle final state
 	})
 }
 
 func TestConvenience_ApiKeyFromEnv_Gemini(t *testing.T) {
-	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
-	// resetGlobalStateAndClose() // No longer needed at start if t.Cleanup is used
+	t.Cleanup(resetGlobalStateAndClose)
 
 	originalApiKey := os.Getenv("GEMINI_API_KEY")
 
@@ -107,23 +98,21 @@ func TestConvenience_ApiKeyFromEnv_Gemini(t *testing.T) {
 
 	resBool, errBool := IsEven(20)
 	checkConvenienceResult(t, resBool, errBool, true, "IsEven", 20)
-	// resetGlobalStateAndClose() // Let t.Cleanup handle final state
 }
 
 func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
-	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
-	// resetGlobalStateAndClose() // No longer needed at start
+	t.Cleanup(resetGlobalStateAndClose)
 
 	_, err := IsEven(2)
 	if err == nil {
 		t.Fatal("Expected error when calling IsEven without API key, got nil")
 	}
-	expectedErrorMsg := "gemini API key not set or instance not initialized. Call SetAPIKey() first" // Removed period
+	expectedErrorMsg := "gemini API key not set or instance not initialized. Call SetAPIKey() first"
 	if err.Error() != expectedErrorMsg {
 		t.Errorf("Expected error message '%s', got '%s'", expectedErrorMsg, err.Error())
 	}
 
-	err = SetAPIKey("") // This will attempt to clear/reset the global instance
+	err = SetAPIKey("")
 	if err == nil {
 		t.Fatal("Expected error when calling SetAPIKey with empty string, got nil")
 	}
@@ -139,9 +128,9 @@ func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
 }
 
 func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
-	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
+	t.Cleanup(resetGlobalStateAndClose)
 
-	var apiKey string // Declare apiKey
+	var apiKey string
 	envKeyForTests := os.Getenv("GEMINI_API_KEY_FOR_TESTS")
 	envKeyGlobal := os.Getenv("GEMINI_API_KEY")
 
@@ -150,11 +139,8 @@ func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 	} else if envKeyGlobal != "" {
 		apiKey = envKeyGlobal
 	} else {
-		// If neither env var is set, skip the test as no key is available.
-		// The original default "test-key-for-options-gemini" was not used
-		// because the test would skip in this scenario.
 		t.Skip("Skipping TestConvenience_SetAPIKeyWithModelOptions_Gemini: No API key available from GEMINI_API_KEY_FOR_TESTS or GEMINI_API_KEY.")
-		return // Must return after t.Skip
+		return
 	}
 
 	customModel := "gemini-pro"
@@ -162,15 +148,12 @@ func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 	customOpts := GeminiModelOptions{Model: customModel, Temperature: &customTemp}
 	err := SetAPIKey(apiKey, customOpts)
 	if err != nil {
-		// If the hang was due to NewClient, it should now timeout and fail here.
 		t.Fatalf("SetAPIKey with custom model options failed: %v", err)
 	}
 
-	// Lock here to check global state is dangerous if SetAPIKey failed to unlock,
-	// but SetAPIKey uses defer for its lock.
 	globalMu.Lock()
-	instanceToCheck := globalGeminiInstance // Copy the value under lock
-	globalMu.Unlock()                       // Unlock immediately after reading
+	instanceToCheck := globalGeminiInstance
+	globalMu.Unlock()
 
 	if instanceToCheck == nil {
 		t.Fatal("globalGeminiInstance is nil after SetAPIKey with custom options")
@@ -178,9 +161,7 @@ func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 	if instanceToCheck.modelName != customOpts.Model {
 		t.Errorf("Expected model %s, got %s", customOpts.Model, instanceToCheck.modelName)
 	}
-	// QF1008: Use direct access to Temperature due to embedding
 	if instanceToCheck.genaiModel.Temperature == nil || *instanceToCheck.genaiModel.Temperature != *customOpts.Temperature {
 		t.Errorf("Expected temperature %f, got %v", *customOpts.Temperature, instanceToCheck.genaiModel.Temperature)
 	}
-	// resetGlobalStateAndClose() // Let t.Cleanup handle final state
 }

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time" // Import time package
+	"time"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -52,7 +52,7 @@ type IsEvenAiGemini struct {
 // NewIsEvenAiGemini creates a new IsEvenAiGemini client.
 func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...GeminiModelOptions) (*IsEvenAiGemini, error) {
 	if clientOpts.APIKey == "" {
-		return nil, errors.New("gemini API key is required") // ST1005: uncapitalize
+		return nil, errors.New("gemini API key is required")
 	}
 
 	opts := []option.ClientOption{option.WithAPIKey(clientOpts.APIKey)}
@@ -61,10 +61,10 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 	}
 
 	// Use a context with timeout for client creation
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // 30-second timeout for client creation
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	createdGenaiClient, err := genai.NewClient(ctx, opts...) // Pass the timed context
+	createdGenaiClient, err := genai.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
@@ -100,24 +100,20 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		modelName:   config.Model,
 	}
 
-	// The context 'ctx' used for genai.NewClient (above) has a timeout for client creation.
-	// For the queryFunc below, which makes individual API calls, it's important to use
-	// a new, independent context for each call to avoid issues if the client creation
-	// context had expired or if calls need their own timeout management.
+	// Each API call gets its own context with a timeout. This makes the query robust
+	// against network issues for individual calls and independent of the client creation context.
 	queryFunc := func(prompt string) (*bool, error) {
-		// Each API call gets its own context with a timeout. This makes the query robust
-		// against network issues for individual calls and independent of the client creation context.
-		apiCallCtx, apiCallCancel := context.WithTimeout(context.Background(), 30*time.Second) // Timeout for this specific API call
+		apiCallCtx, apiCallCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer apiCallCancel()
 
-		resp, err := ai.genaiModel.GenerateContent(apiCallCtx, genai.Text(prompt)) // Use apiCallCtx
+		resp, err := ai.genaiModel.GenerateContent(apiCallCtx, genai.Text(prompt))
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate content from Gemini API: %w", err)
 		}
 
 		if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
 			if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason != genai.BlockReasonUnspecified {
-				return nil, fmt.Errorf("gemini API request blocked, reason: %s", resp.PromptFeedback.BlockReason.String()) // ST1005: uncapitalize
+				return nil, fmt.Errorf("gemini API request blocked, reason: %s", resp.PromptFeedback.BlockReason.String())
 			}
 			return nil, nil // Undefined response
 		}
@@ -125,14 +121,11 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		part := resp.Candidates[0].Content.Parts[0]
 		textContent, ok := part.(genai.Text)
 		if !ok {
-			// If the response isn't simple text as expected (e.g., function call, other data),
-			// treat as undefined for this library's purpose.
 			return nil, fmt.Errorf("unexpected response part type: %T from Gemini API. Content: %+v", part, resp.Candidates[0].Content.Parts)
 		}
 
 		responseContent := strings.ToLower(strings.TrimSpace(string(textContent)))
 
-		// QF1003: Use tagged switch
 		switch responseContent {
 		case "true":
 			b := true
@@ -141,7 +134,6 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 			b := false
 			return &b, nil
 		default:
-			// If the response is not "true" or "false", treat as undefined.
 			return nil, nil
 		}
 	}

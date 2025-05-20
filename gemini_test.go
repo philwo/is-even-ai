@@ -35,12 +35,11 @@ func TestIsEvenAiGemini_Integration(t *testing.T) {
 	}
 
 	clientOpts := GeminiClientOptions{APIKey: apiKey}
-	// Default model is gemini-2.0-flash-lite, temperature 0
 	ai, err := NewIsEvenAiGemini(clientOpts)
 	if err != nil {
 		t.Fatalf("Failed to create NewIsEvenAiGemini: %v", err)
 	}
-	defer func() { _ = ai.Close() }() // Checked error
+	defer func() { _ = ai.Close() }()
 
 	t.Run("IsEven", func(t *testing.T) {
 		res, err := ai.IsEven(2)
@@ -97,12 +96,11 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewIsEvenAiGemini failed: %v", err)
 		}
-		defer func() { _ = ai.Close() }() // Checked error
+		defer func() { _ = ai.Close() }()
 
 		if ai.modelName != "gemini-2.0-flash-lite" {
 			t.Errorf("Expected default model gemini-2.0-flash-lite, got %s", ai.modelName)
 		}
-		// QF1008: Use direct access to Temperature due to embedding
 		if ai.genaiModel.Temperature == nil || *ai.genaiModel.Temperature != 0.0 {
 			temp := "nil"
 			if ai.genaiModel.Temperature != nil {
@@ -114,7 +112,7 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 
 	t.Run("CustomModelOptions", func(t *testing.T) {
 		clientOpts := GeminiClientOptions{APIKey: apiKey}
-		customModel := "gemini-pro" // Example custom model
+		customModel := "gemini-pro"
 		var customTemp float32 = 0.7
 		modelOpts := GeminiModelOptions{Model: customModel, Temperature: &customTemp}
 
@@ -122,12 +120,11 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewIsEvenAiGemini failed: %v", err)
 		}
-		defer func() { _ = ai.Close() }() // Checked error
+		defer func() { _ = ai.Close() }()
 
 		if ai.modelName != customModel {
 			t.Errorf("Expected custom model %s, got %s", customModel, ai.modelName)
 		}
-		// QF1008: Use direct access to Temperature due to embedding
 		if ai.genaiModel.Temperature == nil || *ai.genaiModel.Temperature != customTemp {
 			temp := "nil"
 			if ai.genaiModel.Temperature != nil {
@@ -141,20 +138,19 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		_, err := NewIsEvenAiGemini(GeminiClientOptions{APIKey: ""})
 		if err == nil {
 			t.Error("Expected error for empty API key, got nil")
-		} else if err.Error() != "gemini API key is required" { // ST1005: uncapitalized
+		} else if err.Error() != "gemini API key is required" {
 			t.Errorf("Expected error 'gemini API key is required', got '%s'", err.Error())
 		}
 	})
 }
 
 func TestIsEvenAiGemini_APIFailure(t *testing.T) {
-	// Using an invalid API key should cause an error during the API call.
 	clientOpts := GeminiClientOptions{APIKey: "invalid-gemini-api-key-for-test"}
 	ai, err := NewIsEvenAiGemini(clientOpts)
 	if err != nil {
 		t.Fatalf("NewIsEvenAiGemini with invalid key unexpectedly failed on creation: %v (expected failure on call)", err)
 	}
-	defer func() { _ = ai.Close() }() // Checked error
+	defer func() { _ = ai.Close() }()
 
 	_, err = ai.IsEven(2)
 	if err == nil {
