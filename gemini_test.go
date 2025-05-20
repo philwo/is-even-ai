@@ -40,7 +40,7 @@ func TestIsEvenAiGemini_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create NewIsEvenAiGemini: %v", err)
 	}
-	defer ai.Close()
+	defer func() { _ = ai.Close() }() // Checked error
 
 	t.Run("IsEven", func(t *testing.T) {
 		res, err := ai.IsEven(2)
@@ -97,15 +97,16 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewIsEvenAiGemini failed: %v", err)
 		}
-		defer ai.Close()
+		defer func() { _ = ai.Close() }() // Checked error
 
-		if ai.modelName != "gemini-2.0-flash-lite" { // Changed: ai.genaiModel.ModelName to ai.modelName
-			t.Errorf("Expected default model gemini-2.0-flash-lite, got %s", ai.modelName) // Changed: ai.genaiModel.ModelName to ai.modelName
+		if ai.modelName != "gemini-2.0-flash-lite" {
+			t.Errorf("Expected default model gemini-2.0-flash-lite, got %s", ai.modelName)
 		}
-		if ai.genaiModel.GenerationConfig.Temperature == nil || *ai.genaiModel.GenerationConfig.Temperature != 0.0 {
+		// QF1008: Use direct access to Temperature due to embedding
+		if ai.genaiModel.Temperature == nil || *ai.genaiModel.Temperature != 0.0 {
 			temp := "nil"
-			if ai.genaiModel.GenerationConfig.Temperature != nil {
-				temp = fmt.Sprintf("%f", *ai.genaiModel.GenerationConfig.Temperature)
+			if ai.genaiModel.Temperature != nil {
+				temp = fmt.Sprintf("%f", *ai.genaiModel.Temperature)
 			}
 			t.Errorf("Expected default temperature 0.0, got %s", temp)
 		}
@@ -121,15 +122,16 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewIsEvenAiGemini failed: %v", err)
 		}
-		defer ai.Close()
+		defer func() { _ = ai.Close() }() // Checked error
 
-		if ai.modelName != customModel { // Changed: ai.genaiModel.ModelName to ai.modelName
-			t.Errorf("Expected custom model %s, got %s", customModel, ai.modelName) // Changed: ai.genaiModel.ModelName to ai.modelName
+		if ai.modelName != customModel {
+			t.Errorf("Expected custom model %s, got %s", customModel, ai.modelName)
 		}
-		if ai.genaiModel.GenerationConfig.Temperature == nil || *ai.genaiModel.GenerationConfig.Temperature != customTemp {
+		// QF1008: Use direct access to Temperature due to embedding
+		if ai.genaiModel.Temperature == nil || *ai.genaiModel.Temperature != customTemp {
 			temp := "nil"
-			if ai.genaiModel.GenerationConfig.Temperature != nil {
-				temp = fmt.Sprintf("%f", *ai.genaiModel.GenerationConfig.Temperature)
+			if ai.genaiModel.Temperature != nil {
+				temp = fmt.Sprintf("%f", *ai.genaiModel.Temperature)
 			}
 			t.Errorf("Expected custom temperature %f, got %s", customTemp, temp)
 		}
@@ -139,8 +141,8 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		_, err := NewIsEvenAiGemini(GeminiClientOptions{APIKey: ""})
 		if err == nil {
 			t.Error("Expected error for empty API key, got nil")
-		} else if err.Error() != "Gemini API key is required" {
-			t.Errorf("Expected error 'Gemini API key is required', got '%s'", err.Error())
+		} else if err.Error() != "gemini API key is required" { // ST1005: uncapitalized
+			t.Errorf("Expected error 'gemini API key is required', got '%s'", err.Error())
 		}
 	})
 }
@@ -152,7 +154,7 @@ func TestIsEvenAiGemini_APIFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewIsEvenAiGemini with invalid key unexpectedly failed on creation: %v (expected failure on call)", err)
 	}
-	defer ai.Close()
+	defer func() { _ = ai.Close() }() // Checked error
 
 	_, err = ai.IsEven(2)
 	if err == nil {

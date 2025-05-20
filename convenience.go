@@ -8,6 +8,7 @@ package is_even_ai
 import (
 	"errors"
 	"fmt"
+	"log" // Added for logging Close errors, if desired
 	"sync"
 )
 
@@ -27,7 +28,10 @@ func SetAPIKey(apiKey string, modelOpts ...GeminiModelOptions) error {
 	if apiKey == "" {
 		apiKeyIsSet = false
 		if globalGeminiInstance != nil {
-			globalGeminiInstance.Close() // Clean up existing client
+			if err := globalGeminiInstance.Close(); err != nil { // Checked error
+				// Optionally log this error, though in many cases, cleanup errors are ignored
+				log.Printf("Error closing previous globalGeminiInstance: %v", err)
+			}
 		}
 		globalGeminiInstance = nil
 		return errors.New("API key cannot be empty")
@@ -45,13 +49,17 @@ func SetAPIKey(apiKey string, modelOpts ...GeminiModelOptions) error {
 	if err != nil {
 		apiKeyIsSet = false
 		if globalGeminiInstance != nil {
-			globalGeminiInstance.Close()
+			if errClose := globalGeminiInstance.Close(); errClose != nil { // Checked error
+				log.Printf("Error closing existing globalGeminiInstance on failure: %v", errClose)
+			}
 		}
 		globalGeminiInstance = nil // Ensure instance is nil on error
 		return fmt.Errorf("failed to initialize global IsEvenAiGemini instance: %w", err)
 	}
 	if globalGeminiInstance != nil { // Close previous instance if any
-		globalGeminiInstance.Close()
+		if errClose := globalGeminiInstance.Close(); errClose != nil { // Checked error
+			log.Printf("Error closing previous globalGeminiInstance before new assignment: %v", errClose)
+		}
 	}
 	globalGeminiInstance = instance
 	apiKeyIsSet = true
@@ -62,7 +70,7 @@ func getGlobalGeminiInstance() (*IsEvenAiGemini, error) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
 	if !apiKeyIsSet || globalGeminiInstance == nil {
-		return nil, errors.New("Gemini API key not set or instance not initialized. Call SetAPIKey() first.")
+		return nil, errors.New("gemini API key not set or instance not initialized. Call SetAPIKey() first") // Removed period
 	}
 	return globalGeminiInstance, nil
 }

@@ -65,8 +65,8 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 
 		if originalApiKey != "" {
 			currentEnvKey := os.Getenv("GEMINI_API_KEY")
-			os.Unsetenv("GEMINI_API_KEY")
-			defer os.Setenv("GEMINI_API_KEY", currentEnvKey)
+			_ = os.Unsetenv("GEMINI_API_KEY")                                 // Checked error
+			defer func() { _ = os.Setenv("GEMINI_API_KEY", currentEnvKey) }() // Checked error
 		}
 
 		err := SetAPIKey(apiKeyForTest)
@@ -118,7 +118,7 @@ func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error when calling IsEven without API key, got nil")
 	}
-	expectedErrorMsg := "Gemini API key not set or instance not initialized. Call SetAPIKey() first."
+	expectedErrorMsg := "gemini API key not set or instance not initialized. Call SetAPIKey() first" // Removed period
 	if err.Error() != expectedErrorMsg {
 		t.Errorf("Expected error message '%s', got '%s'", expectedErrorMsg, err.Error())
 	}
@@ -140,16 +140,21 @@ func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
 
 func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
-	// resetGlobalStateAndClose() // No longer needed at start
 
-	apiKey := "test-key-for-options-gemini"
-	if os.Getenv("GEMINI_API_KEY_FOR_TESTS") != "" {
-		apiKey = os.Getenv("GEMINI_API_KEY_FOR_TESTS")
-	} else if os.Getenv("GEMINI_API_KEY") != "" {
-		apiKey = os.Getenv("GEMINI_API_KEY")
+	var apiKey string // Declare apiKey
+	envKeyForTests := os.Getenv("GEMINI_API_KEY_FOR_TESTS")
+	envKeyGlobal := os.Getenv("GEMINI_API_KEY")
+
+	if envKeyForTests != "" {
+		apiKey = envKeyForTests
+	} else if envKeyGlobal != "" {
+		apiKey = envKeyGlobal
 	} else {
-		t.Skip("Skipping TestConvenience_SetAPIKeyWithModelOptions_Gemini: No API key available.")
-		return
+		// If neither env var is set, skip the test as no key is available.
+		// The original default "test-key-for-options-gemini" was not used
+		// because the test would skip in this scenario.
+		t.Skip("Skipping TestConvenience_SetAPIKeyWithModelOptions_Gemini: No API key available from GEMINI_API_KEY_FOR_TESTS or GEMINI_API_KEY.")
+		return // Must return after t.Skip
 	}
 
 	customModel := "gemini-pro"
@@ -173,8 +178,9 @@ func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 	if instanceToCheck.modelName != customOpts.Model {
 		t.Errorf("Expected model %s, got %s", customOpts.Model, instanceToCheck.modelName)
 	}
-	if instanceToCheck.genaiModel.GenerationConfig.Temperature == nil || *instanceToCheck.genaiModel.GenerationConfig.Temperature != *customOpts.Temperature {
-		t.Errorf("Expected temperature %f, got %v", *customOpts.Temperature, instanceToCheck.genaiModel.GenerationConfig.Temperature)
+	// QF1008: Use direct access to Temperature due to embedding
+	if instanceToCheck.genaiModel.Temperature == nil || *instanceToCheck.genaiModel.Temperature != *customOpts.Temperature {
+		t.Errorf("Expected temperature %f, got %v", *customOpts.Temperature, instanceToCheck.genaiModel.Temperature)
 	}
 	// resetGlobalStateAndClose() // Let t.Cleanup handle final state
 }

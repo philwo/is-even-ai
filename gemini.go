@@ -52,7 +52,7 @@ type IsEvenAiGemini struct {
 // NewIsEvenAiGemini creates a new IsEvenAiGemini client.
 func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...GeminiModelOptions) (*IsEvenAiGemini, error) {
 	if clientOpts.APIKey == "" {
-		return nil, errors.New("Gemini API key is required")
+		return nil, errors.New("gemini API key is required") // ST1005: uncapitalize
 	}
 
 	opts := []option.ClientOption{option.WithAPIKey(clientOpts.APIKey)}
@@ -117,7 +117,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 
 		if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
 			if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason != genai.BlockReasonUnspecified {
-				return nil, fmt.Errorf("Gemini API request blocked, reason: %s", resp.PromptFeedback.BlockReason.String())
+				return nil, fmt.Errorf("gemini API request blocked, reason: %s", resp.PromptFeedback.BlockReason.String()) // ST1005: uncapitalize
 			}
 			return nil, nil // Undefined response
 		}
@@ -132,15 +132,18 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 
 		responseContent := strings.ToLower(strings.TrimSpace(string(textContent)))
 
-		if responseContent == "true" {
+		// QF1003: Use tagged switch
+		switch responseContent {
+		case "true":
 			b := true
 			return &b, nil
-		} else if responseContent == "false" {
+		case "false":
 			b := false
 			return &b, nil
+		default:
+			// If the response is not "true" or "false", treat as undefined.
+			return nil, nil
 		}
-		// If the response is not "true" or "false", treat as undefined.
-		return nil, nil
 	}
 
 	ai.IsEvenAiCore = NewIsEvenAiCore(DefaultGeminiPromptTemplates, queryFunc)
