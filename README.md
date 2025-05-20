@@ -10,12 +10,41 @@ Uses Google's Gemini AI models (defaulting to `gemini-2.0-flash-lite`) under the
 
 For all those who want to use AI in their Go product but don't know how.
 
-Inspired by the famous [`is-even`](https://www.npmjs.com/package/is-even) npm package and related AI adaptations. This is a Go adaptation.
+Inspired by the famous [`is-even`](https://www.npmjs.com/package/is-even) npm package and related AI adaptations. This Go version was 100% vibe coded by iteratively asking Gemini 2.5 Pro to rewrite the original code into Go, fix build / test / lint errors, cleanup and polish the code, and finally remove unneeded comments.
 
 ## Installation
 
 ```sh
 go get github.com/philwo/is-even-ai
+```
+
+## Example
+
+```sh
+$ go run example/main.go
+Using convenience functions:
+Is 4 even? true
+Is 4 odd? false
+
+Is 7 even? false
+Is 7 odd? true
+
+Is 0 even? true
+Is 0 odd? false
+
+Is 13 even? false
+Is 13 odd? true
+
+Is -2 even? true
+Is -2 odd? false
+
+Is 42 even? true
+Is 42 odd? false
+
+Are 10 and 10 equal? true
+
+Using a direct instance:
+Is 100 > 50? true
 ```
 
 ## Usage
@@ -120,3 +149,7 @@ The following methods return `(*bool, error)`. The `*bool` can be true, false, o
 - `AreNotEqual(a int, b int)`
 - `IsGreaterThan(a int, b int)`
 - `IsLessThan(a int, b int)`
+
+## Disclaimer
+
+This is just for fun and not intended for active development or use. Issues and contributions are handled on a best effort basis by my various AI agents. I have not reviewed the code that Gemini wrote, so before trying it out, I recommend asking an AI to check it for any problematic behavior or bugs.
