@@ -94,8 +94,8 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		}
 		defer ai.Close()
 
-		if ai.genaiModel.ModelName != "gemini-2.0-flash-lite" {
-			t.Errorf("Expected default model gemini-2.0-flash-lite, got %s", ai.genaiModel.ModelName)
+		if ai.modelName != "gemini-2.0-flash-lite" { // Changed: ai.genaiModel.ModelName to ai.modelName
+			t.Errorf("Expected default model gemini-2.0-flash-lite, got %s", ai.modelName) // Changed: ai.genaiModel.ModelName to ai.modelName
 		}
 		if ai.genaiModel.GenerationConfig.Temperature == nil || *ai.genaiModel.GenerationConfig.Temperature != 0.0 {
 			temp := "nil"
@@ -118,8 +118,8 @@ func TestNewIsEvenAiGemini_Options(t *testing.T) {
 		}
 		defer ai.Close()
 
-		if ai.genaiModel.ModelName != customModel {
-			t.Errorf("Expected custom model %s, got %s", customModel, ai.genaiModel.ModelName)
+		if ai.modelName != customModel { // Changed: ai.genaiModel.ModelName to ai.modelName
+			t.Errorf("Expected custom model %s, got %s", customModel, ai.modelName) // Changed: ai.genaiModel.ModelName to ai.modelName
 		}
 		if ai.genaiModel.GenerationConfig.Temperature == nil || *ai.genaiModel.GenerationConfig.Temperature != customTemp {
 			temp := "nil"
@@ -154,8 +154,6 @@ func TestIsEvenAiGemini_APIFailure(t *testing.T) {
 		t.Error("Expected an error from IsEven call with failing API key, got nil")
 	} else {
 		t.Logf("Got expected error (this is good for this test case): %v", err)
-		// Check for specific error content if possible, e.g., permission denied or authentication error.
-		// The actual error message from go-genai might vary.
 		if !strings.Contains(strings.ToLower(err.Error()), "api key not valid") &&
 			!strings.Contains(strings.ToLower(err.Error()), "permission denied") &&
 			!strings.Contains(strings.ToLower(err.Error()), "authentication") {

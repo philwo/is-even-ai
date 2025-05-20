@@ -38,9 +38,7 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 
 	if originalApiKey == "" {
 		t.Log("GEMINI_API_KEY not in env, SetAPIKey test will use a dummy key for instantiation logic only.")
-		// For robust testing without hitting API, a mock HTTP transport at global level would be needed.
-		// This test will use a real key if available.
-		if os.Getenv("GEMINI_API_KEY_FOR_TESTS") != "" { // Changed to GEMINI_API_KEY_FOR_TESTS
+		if os.Getenv("GEMINI_API_KEY_FOR_TESTS") != "" {
 			apiKeyForTest = os.Getenv("GEMINI_API_KEY_FOR_TESTS")
 		} else {
 			t.Skip("Skipping TestConvenience_SetAPIKeyAndUse_Gemini: GEMINI_API_KEY_FOR_TESTS not set, and no fallback for full convenience function test without a real key.")
@@ -52,8 +50,6 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 
 	t.Run("WithKeyPassedToSetAPIKey_Gemini", func(t *testing.T) {
 		resetGlobalStateAndClose()
-		// Temporarily unset GEMINI_API_KEY from environment if it was there
-		// to ensure SetAPIKey is the one providing the key.
 		if originalApiKey != "" {
 			currentEnvKey := os.Getenv("GEMINI_API_KEY")
 			os.Unsetenv("GEMINI_API_KEY")
@@ -70,21 +66,19 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 		if globalGeminiInstance == nil {
 			t.Fatal("globalGeminiInstance should be initialized after SetAPIKey")
 		}
-		if globalGeminiInstance.apiKey != apiKeyForTest { // Assuming apiKey is stored in IsEvenAiGemini
+		if globalGeminiInstance.apiKey != apiKeyForTest {
 			t.Fatalf("globalGeminiInstance.apiKey = %s; want %s", globalGeminiInstance.apiKey, apiKeyForTest)
 		}
 
-		// Test convenience functions
 		resBool, errBool := IsEven(2)
 		checkConvenienceResult(t, resBool, errBool, true, "IsEven", 2)
-		// Add more checks as in original test
-		resetGlobalStateAndClose() // Clean up for next test
+		resetGlobalStateAndClose()
 	})
 }
 
 func TestConvenience_ApiKeyFromEnv_Gemini(t *testing.T) {
 	resetGlobalStateAndClose()
-	originalApiKey := os.Getenv("GEMINI_API_KEY") // Changed to GEMINI_API_KEY
+	originalApiKey := os.Getenv("GEMINI_API_KEY")
 
 	if originalApiKey == "" {
 		t.Skip("Skipping TestConvenience_ApiKeyFromEnv_Gemini: GEMINI_API_KEY not set in environment.")
@@ -108,7 +102,7 @@ func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error when calling IsEven without API key, got nil")
 	}
-	expectedErrorMsg := "Gemini API key not set or instance not initialized. Call SetAPIKey() first." // Updated error message
+	expectedErrorMsg := "Gemini API key not set or instance not initialized. Call SetAPIKey() first."
 	if err.Error() != expectedErrorMsg {
 		t.Errorf("Expected error message '%s', got '%s'", expectedErrorMsg, err.Error())
 	}
@@ -117,7 +111,7 @@ func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error when calling SetAPIKey with empty string, got nil")
 	}
-	if err.Error() != "API key cannot be empty" { // This error comes from SetAPIKey directly
+	if err.Error() != "API key cannot be empty" {
 		t.Errorf("Expected error 'API key cannot be empty', got '%s'", err.Error())
 	}
 	if apiKeyIsSet {
@@ -140,7 +134,7 @@ func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 		return
 	}
 
-	customModel := "gemini-pro" // Example for Gemini
+	customModel := "gemini-pro"
 	var customTemp float32 = 0.7
 	customOpts := GeminiModelOptions{Model: customModel, Temperature: &customTemp}
 	err := SetAPIKey(apiKey, customOpts)
@@ -154,8 +148,8 @@ func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 	if globalGeminiInstance == nil {
 		t.Fatal("globalGeminiInstance is nil after SetAPIKey with custom options")
 	}
-	if globalGeminiInstance.genaiModel.ModelName != customOpts.Model {
-		t.Errorf("Expected model %s, got %s", customOpts.Model, globalGeminiInstance.genaiModel.ModelName)
+	if globalGeminiInstance.modelName != customOpts.Model { // Changed: globalGeminiInstance.genaiModel.ModelName to globalGeminiInstance.modelName
+		t.Errorf("Expected model %s, got %s", customOpts.Model, globalGeminiInstance.modelName) // Changed: globalGeminiInstance.genaiModel.ModelName to globalGeminiInstance.modelName
 	}
 	if globalGeminiInstance.genaiModel.GenerationConfig.Temperature == nil || *globalGeminiInstance.genaiModel.GenerationConfig.Temperature != *customOpts.Temperature {
 		t.Errorf("Expected temperature %f, got %v", *customOpts.Temperature, globalGeminiInstance.genaiModel.GenerationConfig.Temperature)

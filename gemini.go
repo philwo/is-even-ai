@@ -38,13 +38,12 @@ type GeminiModelOptions struct {
 type IsEvenAiGemini struct {
 	*IsEvenAiCore
 	genaiModel  *genai.GenerativeModel
-	genaiClient *genai.Client // Store the client to close it later
+	genaiClient *genai.Client
 	apiKey      string
+	modelName   string // Added to store the model name
 }
 
 // NewIsEvenAiGemini creates a new IsEvenAiGemini client.
-// 'clientOpts' are options for the API key and optional custom endpoint.
-// 'modelConfigOpts' can optionally override default model and temperature settings.
 func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...GeminiModelOptions) (*IsEvenAiGemini, error) {
 	if clientOpts.APIKey == "" {
 		return nil, errors.New("Gemini API key is required")
@@ -56,7 +55,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 	}
 
 	ctx := context.Background()
-	createdGenaiClient, err := genai.NewClient(ctx, opts...) // Renamed to avoid conflict
+	createdGenaiClient, err := genai.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
@@ -64,7 +63,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 	config := GeminiModelOptions{
 		Model: "gemini-2.0-flash-lite", // Default model
 	}
-	var defaultTemp float32 = 0.0 // Default temperature for deterministic responses
+	var defaultTemp float32 = 0.0
 	config.Temperature = &defaultTemp
 
 	if len(modelConfigOpts) > 0 {
@@ -77,7 +76,6 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 	}
 
 	genaiModel := createdGenaiClient.GenerativeModel(config.Model)
-	// Set system instruction
 	genaiModel.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{genai.Text(geminiSystemPrompt)},
 	}
@@ -89,7 +87,8 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 	ai := &IsEvenAiGemini{
 		apiKey:      clientOpts.APIKey,
 		genaiModel:  genaiModel,
-		genaiClient: createdGenaiClient, // Store the created client
+		genaiClient: createdGenaiClient,
+		modelName:   config.Model, // Store the configured model name
 	}
 
 	queryFunc := func(prompt string) (*bool, error) {
@@ -102,7 +101,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 			if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason != genai.BlockReasonUnspecified {
 				return nil, fmt.Errorf("Gemini API request blocked, reason: %s", resp.PromptFeedback.BlockReason.String())
 			}
-			return nil, nil // Undetermined or empty response
+			return nil, nil
 		}
 
 		part := resp.Candidates[0].Content.Parts[0]
@@ -120,7 +119,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 			b := false
 			return &b, nil
 		}
-		return nil, nil // Response was not strictly "true" or "false"
+		return nil, nil
 	}
 
 	ai.IsEvenAiCore = NewIsEvenAiCore(DefaultGeminiPromptTemplates, queryFunc)
@@ -129,7 +128,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 
 // Close client connections if any were long-lived.
 func (ai *IsEvenAiGemini) Close() error {
-	if ai.genaiClient != nil { // Use the stored genaiClient
+	if ai.genaiClient != nil {
 		return ai.genaiClient.Close()
 	}
 	return nil
