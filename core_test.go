@@ -28,11 +28,12 @@ type mockQueryFunc struct {
 func (m *mockQueryFunc) query(prompt string) (*bool, error) {
 	m.called = true
 	m.lastPrompt = prompt
-	if m.returnValue == nil && m.returnError == nil { // Default to true if not set
-		defaultTrue := true
-		return &defaultTrue, nil
-	}
-	return m.returnValue, m.returnError
+	// Removed default true logic:
+	// if m.returnValue == nil && m.returnError == nil { // Default to true if not set
+	// 	defaultTrue := true
+	// 	return &defaultTrue, nil
+	// }
+	return m.returnValue, m.returnError // Directly return what's set
 }
 
 func (m *mockQueryFunc) reset() {
@@ -192,20 +193,24 @@ func TestNewIsEvenAiCore_NilQueryFunc(t *testing.T) {
 func TestIsEvenAiCore_GetPromptErrors(t *testing.T) {
 	core := NewIsEvenAiCore(IsEvenAiCorePromptTemplates{}, func(prompt string) (*bool, error) { return nil, nil }) // Empty templates
 
-	_, err := core.getPrompt("isEven") // Not enough args
-	if err == nil || !strings.Contains(err.Error(), "not enough arguments") {
-		t.Errorf("Expected error for not enough arguments for isEven, got %v", err)
-	}
+	// Removed the following problematic check as it's covered by the mandatoryTemplates loop
+	// and its assertion was expecting "not enough arguments" when "mandatory and not defined" is correct here.
+	/*
+		_, err := core.getPrompt("isEven") // Not enough args
+		if err == nil || !strings.Contains(err.Error(), "not enough arguments") {
+			t.Errorf("Expected error for not enough arguments for isEven, got %v", err)
+		}
+	*/
 
 	// Test for mandatory templates not defined
 	mandatoryTemplates := []string{"isEven", "areEqual", "isGreaterThan"}
 	for _, mt := range mandatoryTemplates {
 		t.Run(fmt.Sprintf("MandatoryTemplate_%s_Missing", mt), func(t *testing.T) {
-			// For single arg prompts
-			args := []int{1}
+			args := []int{1} // These args are for the prompt function if it were defined
 			if mt == "areEqual" || mt == "isGreaterThan" {
-				args = []int{1, 2} // For two arg prompts
+				args = []int{1, 2}
 			}
+			// With empty templates, this will correctly error on the template being mandatory and not defined.
 			_, err := core.getPrompt(mt, args...)
 			if err == nil || !strings.Contains(err.Error(), "mandatory and not defined") {
 				t.Errorf("Expected error for mandatory template %s not defined, got %v", mt, err)
@@ -213,10 +218,50 @@ func TestIsEvenAiCore_GetPromptErrors(t *testing.T) {
 		})
 	}
 
-	_, err = core.getPrompt("unknownPrompt", 1)
+	_, err := core.getPrompt("unknownPrompt", 1)
 	if err == nil || !strings.Contains(err.Error(), "unknown prompt name") {
 		t.Errorf("Expected error for unknown prompt name, got %v", err)
 	}
+
+	// Add new sub-tests for "not enough arguments" when templates are defined
+	t.Run("NotEnoughArguments", func(t *testing.T) {
+		definedTemplates := IsEvenAiCorePromptTemplates{
+			IsEven:        func(n int) string { return "isEven" },
+			IsOdd:         func(n int) string { return "isOdd" },
+			AreEqual:      func(a, b int) string { return "areEqual" },
+			AreNotEqual:   func(a, b int) string { return "areNotEqual" },
+			IsGreaterThan: func(a, b int) string { return "isGreaterThan" },
+			IsLessThan:    func(a, b int) string { return "isLessThan" },
+		}
+		coreWithDefs := NewIsEvenAiCore(definedTemplates, func(prompt string) (*bool, error) { return nil, nil })
+
+		argTestCases := []struct {
+			name        string
+			promptName  string
+			args        []int
+			expectedMsg string
+		}{
+			{"isEven_NoArgs", "isEven", []int{}, "not enough arguments for isEven prompt"},
+			{"isOdd_NoArgs", "isOdd", []int{}, "not enough arguments for isOdd prompt"},
+			{"areEqual_NoArgs", "areEqual", []int{}, "not enough arguments for areEqual prompt"},
+			{"areEqual_OneArg", "areEqual", []int{1}, "not enough arguments for areEqual prompt"},
+			{"areNotEqual_NoArgs", "areNotEqual", []int{}, "not enough arguments for areNotEqual prompt"},
+			{"areNotEqual_OneArg", "areNotEqual", []int{1}, "not enough arguments for areNotEqual prompt"},
+			{"isGreaterThan_NoArgs", "isGreaterThan", []int{}, "not enough arguments for isGreaterThan prompt"},
+			{"isGreaterThan_OneArg", "isGreaterThan", []int{1}, "not enough arguments for isGreaterThan prompt"},
+			{"isLessThan_NoArgs", "isLessThan", []int{}, "not enough arguments for isLessThan prompt"},
+			{"isLessThan_OneArg", "isLessThan", []int{1}, "not enough arguments for isLessThan prompt"},
+		}
+
+		for _, tc := range argTestCases {
+			t.Run(tc.name, func(t *testing.T) {
+				_, err := coreWithDefs.getPrompt(tc.promptName, tc.args...)
+				if err == nil || !strings.Contains(err.Error(), tc.expectedMsg) {
+					t.Errorf("Expected error containing '%s', got %v", tc.expectedMsg, err)
+				}
+			})
+		}
+	})
 }
 
 func TestIsEvenAiCore_ErrorInQuery(t *testing.T) {
