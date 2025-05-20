@@ -9,14 +9,15 @@ import (
 func resetGlobalStateAndClose() {
 	globalMu.Lock()
 	if globalGeminiInstance != nil {
-		globalGeminiInstance.Close()
+		// Consider logging an error from Close() if it occurs during cleanup
+		_ = globalGeminiInstance.Close() // Best effort close
 		globalGeminiInstance = nil
 	}
 	apiKeyIsSet = false
 	globalMu.Unlock()
 }
 
-// Helper function to check boolean pointer results (re-declared or use one from gemini_test.go if visible)
+// Helper function to check boolean pointer results
 func checkConvenienceResult(t *testing.T, val *bool, err error, expected bool, funcName string, inputs ...int) {
 	t.Helper()
 	if err != nil {
@@ -33,7 +34,9 @@ func checkConvenienceResult(t *testing.T, val *bool, err error, expected bool, f
 }
 
 func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
-	originalApiKey := os.Getenv("GEMINI_API_KEY") // Changed to GEMINI_API_KEY
+	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
+
+	originalApiKey := os.Getenv("GEMINI_API_KEY")
 	apiKeyForTest := "test-api-key-from-setapikey-gemini"
 
 	if originalApiKey == "" {
@@ -49,11 +52,16 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 	}
 
 	t.Run("WithKeyPassedToSetAPIKey_Gemini", func(t *testing.T) {
-		resetGlobalStateAndClose()
+		// resetGlobalStateAndClose() // Already handled by t.Cleanup at parent level, or can be specific if sub-test manipulates state uniquely
+		// For subtests, if they independently manipulate the global state and need reset before *other subtests*,
+		// then having reset here is also fine. Or ensure parent cleanup is sufficient.
+		// Let's keep it simple: the parent test's Cleanup should cover this.
+		// If a sub-test fails and SetAPIKey was called, parent cleanup handles it.
+
 		if originalApiKey != "" {
 			currentEnvKey := os.Getenv("GEMINI_API_KEY")
 			os.Unsetenv("GEMINI_API_KEY")
-			defer os.Setenv("GEMINI_API_KEY", currentEnvKey) // Restore
+			defer os.Setenv("GEMINI_API_KEY", currentEnvKey)
 		}
 
 		err := SetAPIKey(apiKeyForTest)
@@ -72,12 +80,14 @@ func TestConvenience_SetAPIKeyAndUse_Gemini(t *testing.T) {
 
 		resBool, errBool := IsEven(2)
 		checkConvenienceResult(t, resBool, errBool, true, "IsEven", 2)
-		resetGlobalStateAndClose()
+		// resetGlobalStateAndClose() // Let t.Cleanup handle final state
 	})
 }
 
 func TestConvenience_ApiKeyFromEnv_Gemini(t *testing.T) {
-	resetGlobalStateAndClose()
+	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
+	// resetGlobalStateAndClose() // No longer needed at start if t.Cleanup is used
+
 	originalApiKey := os.Getenv("GEMINI_API_KEY")
 
 	if originalApiKey == "" {
@@ -92,11 +102,12 @@ func TestConvenience_ApiKeyFromEnv_Gemini(t *testing.T) {
 
 	resBool, errBool := IsEven(20)
 	checkConvenienceResult(t, resBool, errBool, true, "IsEven", 20)
-	resetGlobalStateAndClose()
+	// resetGlobalStateAndClose() // Let t.Cleanup handle final state
 }
 
 func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
-	resetGlobalStateAndClose()
+	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
+	// resetGlobalStateAndClose() // No longer needed at start
 
 	_, err := IsEven(2)
 	if err == nil {
@@ -107,7 +118,7 @@ func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
 		t.Errorf("Expected error message '%s', got '%s'", expectedErrorMsg, err.Error())
 	}
 
-	err = SetAPIKey("")
+	err = SetAPIKey("") // This will attempt to clear/reset the global instance
 	if err == nil {
 		t.Fatal("Expected error when calling SetAPIKey with empty string, got nil")
 	}
@@ -123,7 +134,9 @@ func TestConvenience_NoAPIKeySet_Gemini(t *testing.T) {
 }
 
 func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
-	resetGlobalStateAndClose()
+	t.Cleanup(resetGlobalStateAndClose) // Ensure cleanup after this test
+	// resetGlobalStateAndClose() // No longer needed at start
+
 	apiKey := "test-key-for-options-gemini"
 	if os.Getenv("GEMINI_API_KEY_FOR_TESTS") != "" {
 		apiKey = os.Getenv("GEMINI_API_KEY_FOR_TESTS")
@@ -139,20 +152,24 @@ func TestConvenience_SetAPIKeyWithModelOptions_Gemini(t *testing.T) {
 	customOpts := GeminiModelOptions{Model: customModel, Temperature: &customTemp}
 	err := SetAPIKey(apiKey, customOpts)
 	if err != nil {
+		// If the hang was due to NewClient, it should now timeout and fail here.
 		t.Fatalf("SetAPIKey with custom model options failed: %v", err)
 	}
 
+	// Lock here to check global state is dangerous if SetAPIKey failed to unlock,
+	// but SetAPIKey uses defer for its lock.
 	globalMu.Lock()
-	defer globalMu.Unlock()
+	instanceToCheck := globalGeminiInstance // Copy the value under lock
+	globalMu.Unlock()                       // Unlock immediately after reading
 
-	if globalGeminiInstance == nil {
+	if instanceToCheck == nil {
 		t.Fatal("globalGeminiInstance is nil after SetAPIKey with custom options")
 	}
-	if globalGeminiInstance.modelName != customOpts.Model { // Changed: globalGeminiInstance.genaiModel.ModelName to globalGeminiInstance.modelName
-		t.Errorf("Expected model %s, got %s", customOpts.Model, globalGeminiInstance.modelName) // Changed: globalGeminiInstance.genaiModel.ModelName to globalGeminiInstance.modelName
+	if instanceToCheck.modelName != customOpts.Model {
+		t.Errorf("Expected model %s, got %s", customOpts.Model, instanceToCheck.modelName)
 	}
-	if globalGeminiInstance.genaiModel.GenerationConfig.Temperature == nil || *globalGeminiInstance.genaiModel.GenerationConfig.Temperature != *customOpts.Temperature {
-		t.Errorf("Expected temperature %f, got %v", *customOpts.Temperature, globalGeminiInstance.genaiModel.GenerationConfig.Temperature)
+	if instanceToCheck.genaiModel.GenerationConfig.Temperature == nil || *instanceToCheck.genaiModel.GenerationConfig.Temperature != *customOpts.Temperature {
+		t.Errorf("Expected temperature %f, got %v", *customOpts.Temperature, instanceToCheck.genaiModel.GenerationConfig.Temperature)
 	}
-	resetGlobalStateAndClose()
+	// resetGlobalStateAndClose() // Let t.Cleanup handle final state
 }

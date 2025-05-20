@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time" // Import time package
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -40,7 +41,7 @@ type IsEvenAiGemini struct {
 	genaiModel  *genai.GenerativeModel
 	genaiClient *genai.Client
 	apiKey      string
-	modelName   string // Added to store the model name
+	modelName   string
 }
 
 // NewIsEvenAiGemini creates a new IsEvenAiGemini client.
@@ -54,8 +55,11 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		opts = append(opts, option.WithEndpoint(clientOpts.BaseURL))
 	}
 
-	ctx := context.Background()
-	createdGenaiClient, err := genai.NewClient(ctx, opts...)
+	// Use a context with timeout for client creation
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // 30-second timeout
+	defer cancel()
+
+	createdGenaiClient, err := genai.NewClient(ctx, opts...) // Pass the timed context
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
@@ -88,11 +92,28 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		apiKey:      clientOpts.APIKey,
 		genaiModel:  genaiModel,
 		genaiClient: createdGenaiClient,
-		modelName:   config.Model, // Store the configured model name
+		modelName:   config.Model,
 	}
 
+	// Re-assign ctx for GenerateContent if needed, or use a new one.
+	// For queryFunc, the original ctx from NewIsEvenAiGemini (with timeout) would have expired
+	// or been cancelled if client creation took a while.
+	// It's better that queryFunc uses its own fresh context or one passed into its methods.
+	// The current implementation of queryFunc re-uses the outer 'ctx', which is fine if client creation is quick.
+	// For robustness in queryFunc, it might be better to use context.Background() or a method-specific context.
+	// However, for the hang during NewIsEvenAiGemini, this ctx for NewClient is the key.
+
 	queryFunc := func(prompt string) (*bool, error) {
-		resp, err := ai.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+		// It's generally safer for long-lived clients that GenerateContent uses a fresh context
+		// or one passed into the specific method (e.g., IsEven, IsOdd).
+		// For now, we'll keep the original ctx capture, but be mindful of its lifetime.
+		// If NewIsEvenAiGemini's ctx timed out, subsequent calls to queryFunc might fail immediately
+		// if they reuse that same cancelled ctx.
+		// A simple fix is to use context.Background() for the API call itself.
+		apiCallCtx, apiCallCancel := context.WithTimeout(context.Background(), 30*time.Second) // Timeout for the API call
+		defer apiCallCancel()
+
+		resp, err := ai.genaiModel.GenerateContent(apiCallCtx, genai.Text(prompt)) // Use apiCallCtx
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate content from Gemini API: %w", err)
 		}
