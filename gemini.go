@@ -37,8 +37,9 @@ type GeminiModelOptions struct {
 // IsEvenAiGemini is an implementation of IsEvenAiCore using the Gemini API.
 type IsEvenAiGemini struct {
 	*IsEvenAiCore
-	genaiModel *genai.GenerativeModel
-	apiKey     string
+	genaiModel  *genai.GenerativeModel
+	genaiClient *genai.Client // Store the client to close it later
+	apiKey      string
 }
 
 // NewIsEvenAiGemini creates a new IsEvenAiGemini client.
@@ -55,16 +56,10 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 	}
 
 	ctx := context.Background()
-	genaiClient, err := genai.NewClient(ctx, opts...)
+	createdGenaiClient, err := genai.NewClient(ctx, opts...) // Renamed to avoid conflict
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
-	// Defer closing the client, though for a long-lived IsEvenAiGemini instance,
-	// the client should also be long-lived.
-	// Consider if the client should be closed when IsEvenAiGemini is no longer needed.
-	// For this library structure, we'll assume client is managed with the lifetime of IsEvenAiGemini.
-	// To properly manage, IsEvenAiGemini would need a Close() method:
-	// defer genaiClient.Close() // This would close it immediately, not intended here.
 
 	config := GeminiModelOptions{
 		Model: "gemini-2.0-flash-lite", // Default model
@@ -81,15 +76,20 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		}
 	}
 
-	genaiModel := genaiClient.GenerativeModel(config.Model)
-	genaiModel.SetSystemInstruction(genai.Text(geminiSystemPrompt))
+	genaiModel := createdGenaiClient.GenerativeModel(config.Model)
+	// Set system instruction
+	genaiModel.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(geminiSystemPrompt)},
+	}
+
 	if config.Temperature != nil {
 		genaiModel.SetTemperature(*config.Temperature)
 	}
 
 	ai := &IsEvenAiGemini{
-		apiKey:     clientOpts.APIKey,
-		genaiModel: genaiModel,
+		apiKey:      clientOpts.APIKey,
+		genaiModel:  genaiModel,
+		genaiClient: createdGenaiClient, // Store the created client
 	}
 
 	queryFunc := func(prompt string) (*bool, error) {
@@ -99,7 +99,6 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		}
 
 		if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-			// Try to get error details if any
 			if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason != genai.BlockReasonUnspecified {
 				return nil, fmt.Errorf("Gemini API request blocked, reason: %s", resp.PromptFeedback.BlockReason.String())
 			}
@@ -109,7 +108,6 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		part := resp.Candidates[0].Content.Parts[0]
 		textContent, ok := part.(genai.Text)
 		if !ok {
-			// Check if it's a function call or other part type, though not expected here.
 			return nil, fmt.Errorf("unexpected response part type: %T, content: %+v", part, resp.Candidates[0].Content.Parts)
 		}
 
@@ -122,11 +120,6 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 			b := false
 			return &b, nil
 		}
-		// The AI might respond with more than just "true" or "false".
-		// e.g. "true." or "The answer is true."
-		// For robustness, one might check if the response *contains* "true" or "false"
-		// but the system prompt is strict.
-		// If the response isn't exactly "true" or "false", treat as undefined.
 		return nil, nil // Response was not strictly "true" or "false"
 	}
 
@@ -135,10 +128,9 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 }
 
 // Close client connections if any were long-lived.
-// For go-genai, the client has a Close() method.
 func (ai *IsEvenAiGemini) Close() error {
-	if ai.genaiModel != nil && ai.genaiModel.Client != nil {
-		return ai.genaiModel.Client.Close()
+	if ai.genaiClient != nil { // Use the stored genaiClient
+		return ai.genaiClient.Close()
 	}
 	return nil
 }
