@@ -15,7 +15,8 @@ Inspired by the famous [`is-even`](https://www.npmjs.com/package/is-even) npm pa
 ## Installation
 
 ```sh
-go get [github.com/philwo/is-even-ai](https://github.com/philwo/is-even-ai)
+go get github.com/philwo/is-even-ai
+```
 
 ## Usage
 
@@ -31,7 +32,7 @@ import (
 	"log"
 	"os"
 
-	isevenai "[github.com/philwo/is-even-ai](https://github.com/philwo/is-even-ai)"
+	isevenai "github.com/philwo/is-even-ai"
 )
 
 func main() {
@@ -66,7 +67,7 @@ import (
 	"log"
 	"os"
 
-	isevenai "[github.com/philwo/is-even-ai](https://github.com/philwo/is-even-ai)"
+	isevenai "github.com/philwo/is-even-ai"
 )
 
 func main() {

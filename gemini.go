@@ -56,7 +56,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 	}
 
 	// Use a context with timeout for client creation
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // 30-second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // 30-second timeout for client creation
 	defer cancel()
 
 	createdGenaiClient, err := genai.NewClient(ctx, opts...) // Pass the timed context
@@ -95,22 +95,14 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 		modelName:   config.Model,
 	}
 
-	// Re-assign ctx for GenerateContent if needed, or use a new one.
-	// For queryFunc, the original ctx from NewIsEvenAiGemini (with timeout) would have expired
-	// or been cancelled if client creation took a while.
-	// It's better that queryFunc uses its own fresh context or one passed into its methods.
-	// The current implementation of queryFunc re-uses the outer 'ctx', which is fine if client creation is quick.
-	// For robustness in queryFunc, it might be better to use context.Background() or a method-specific context.
-	// However, for the hang during NewIsEvenAiGemini, this ctx for NewClient is the key.
-
+	// The context 'ctx' used for genai.NewClient (above) has a timeout for client creation.
+	// For the queryFunc below, which makes individual API calls, it's important to use
+	// a new, independent context for each call to avoid issues if the client creation
+	// context had expired or if calls need their own timeout management.
 	queryFunc := func(prompt string) (*bool, error) {
-		// It's generally safer for long-lived clients that GenerateContent uses a fresh context
-		// or one passed into the specific method (e.g., IsEven, IsOdd).
-		// For now, we'll keep the original ctx capture, but be mindful of its lifetime.
-		// If NewIsEvenAiGemini's ctx timed out, subsequent calls to queryFunc might fail immediately
-		// if they reuse that same cancelled ctx.
-		// A simple fix is to use context.Background() for the API call itself.
-		apiCallCtx, apiCallCancel := context.WithTimeout(context.Background(), 30*time.Second) // Timeout for the API call
+		// Each API call gets its own context with a timeout. This makes the query robust
+		// against network issues for individual calls and independent of the client creation context.
+		apiCallCtx, apiCallCancel := context.WithTimeout(context.Background(), 30*time.Second) // Timeout for this specific API call
 		defer apiCallCancel()
 
 		resp, err := ai.genaiModel.GenerateContent(apiCallCtx, genai.Text(prompt)) // Use apiCallCtx
@@ -122,13 +114,15 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 			if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason != genai.BlockReasonUnspecified {
 				return nil, fmt.Errorf("Gemini API request blocked, reason: %s", resp.PromptFeedback.BlockReason.String())
 			}
-			return nil, nil
+			return nil, nil // Undefined response
 		}
 
 		part := resp.Candidates[0].Content.Parts[0]
 		textContent, ok := part.(genai.Text)
 		if !ok {
-			return nil, fmt.Errorf("unexpected response part type: %T, content: %+v", part, resp.Candidates[0].Content.Parts)
+			// If the response isn't simple text as expected (e.g., function call, other data),
+			// treat as undefined for this library's purpose.
+			return nil, fmt.Errorf("unexpected response part type: %T from Gemini API. Content: %+v", part, resp.Candidates[0].Content.Parts)
 		}
 
 		responseContent := strings.ToLower(strings.TrimSpace(string(textContent)))
@@ -140,6 +134,7 @@ func NewIsEvenAiGemini(clientOpts GeminiClientOptions, modelConfigOpts ...Gemini
 			b := false
 			return &b, nil
 		}
+		// If the response is not "true" or "false", treat as undefined.
 		return nil, nil
 	}
 

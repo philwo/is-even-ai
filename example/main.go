@@ -27,28 +27,34 @@ func main() {
 	// --- Using convenience functions ---
 	fmt.Println("Using convenience functions:")
 
-	num1 := 4
-	isEvenResult, err := isevenai.IsEven(num1)
-	if err != nil {
-		log.Printf("Error checking if %d is even: %v", num1, err)
-	} else {
-		if isEvenResult == nil {
-			fmt.Printf("Is %d even? Undefined\n", num1)
-		} else {
-			fmt.Printf("Is %d even? %t\n", num1, *isEvenResult)
-		}
-	}
+	// Define a slice of numbers to test for IsEven and IsOdd
+	numbers := []int{4, 7, 0, 13, -2, 42} // Example numbers
 
-	num2 := 7
-	isOddResult, err := isevenai.IsOdd(num2)
-	if err != nil {
-		log.Printf("Error checking if %d is odd: %v", num2, err)
-	} else {
-		if isOddResult == nil {
-			fmt.Printf("Is %d odd? Undefined\n", num2)
+	for _, num := range numbers {
+		// Check if num is even
+		isEvenResult, err := isevenai.IsEven(num)
+		if err != nil {
+			log.Printf("Error checking if %d is even: %v", num, err)
 		} else {
-			fmt.Printf("Is %d odd? %t\n", num2, *isOddResult)
+			if isEvenResult == nil {
+				fmt.Printf("Is %d even? Undefined\n", num)
+			} else {
+				fmt.Printf("Is %d even? %t\n", num, *isEvenResult)
+			}
 		}
+
+		// Check if num is odd
+		isOddResult, err := isevenai.IsOdd(num)
+		if err != nil {
+			log.Printf("Error checking if %d is odd: %v", num, err)
+		} else {
+			if isOddResult == nil {
+				fmt.Printf("Is %d odd? Undefined\n", num)
+			} else {
+				fmt.Printf("Is %d odd? %t\n", num, *isOddResult)
+			}
+		}
+		fmt.Println() // Add a blank line to separate results for different numbers
 	}
 
 	valA, valB := 10, 10

@@ -12,10 +12,12 @@ type PromptTemplate1 func(n int) string
 type PromptTemplate2 func(a, b int) string
 
 // IsEvenAiCorePromptTemplates holds the templates for generating prompts.
-// Optional templates can be nil. If a template can be asynchronous in TS (returning Promise<string>),
-// the Go equivalent might return (string, error) to handle async operations or simply stick to
-// synchronous string generation if that matches the actual usage (as in OpenAiPromptTemplates).
-// For this translation, we assume synchronous prompt generation.
+//   - IsEven, AreEqual, IsGreaterThan are mandatory.
+//   - IsOdd, AreNotEqual, IsLessThan are optional. If a template for an optional
+//     operation is nil, the corresponding method will use a fallback strategy
+//     (e.g., IsOdd will be derived from !IsEven).
+//
+// All prompt template functions are synchronous and return a string.
 type IsEvenAiCorePromptTemplates struct {
 	IsEven        PromptTemplate1
 	IsOdd         PromptTemplate1 // Optional: if nil, IsOdd will be derived from !IsEven
@@ -120,25 +122,26 @@ func (c *IsEvenAiCore) IsEven(n int) (*bool, error) {
 // If an 'isOdd' prompt template is not provided, it derives the result by negating IsEven(n).
 func (c *IsEvenAiCore) IsOdd(n int) (*bool, error) {
 	prompt, err := c.getPrompt("isOdd", n)
-	// err from getPrompt for optional template being nil is not an actual error for this logic path
-	if err != nil && prompt == "" { // Error might occur if args are wrong, but prompt being "" means template is nil
-		// Proceed with fallback if prompt is empty due to optional template
-	} else if err != nil {
+	if err != nil {
+		// This error means getPrompt failed (e.g., not enough args for a defined template,
+		// or a misconfiguration). It should not proceed to fallback.
 		return nil, fmt.Errorf("failed to get prompt for IsOdd: %w", err)
 	}
 
-	if prompt == "" { // Template was optional and not provided
-		isEvenResult, err := c.IsEven(n)
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine IsOdd by inverting IsEven: %w", err)
-		}
-		if isEvenResult == nil { // IsEven returned undefined
-			return nil, nil
-		}
-		res := !(*isEvenResult)
-		return &res, nil
+	if prompt != "" { // Template was provided and prompt generated successfully
+		return c.query(prompt)
 	}
-	return c.query(prompt)
+
+	// Fallback: template was optional and not provided (i.e., prompt == "" and err == nil from getPrompt)
+	isEvenResult, err := c.IsEven(n)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine IsOdd by inverting IsEven: %w", err)
+	}
+	if isEvenResult == nil { // IsEven returned undefined
+		return nil, nil
+	}
+	res := !(*isEvenResult)
+	return &res, nil
 }
 
 // AreEqual checks if numbers 'a' and 'b' are equal.
@@ -154,24 +157,24 @@ func (c *IsEvenAiCore) AreEqual(a, b int) (*bool, error) {
 // If an 'areNotEqual' prompt template is not provided, it derives the result by negating AreEqual(a,b).
 func (c *IsEvenAiCore) AreNotEqual(a, b int) (*bool, error) {
 	prompt, err := c.getPrompt("areNotEqual", a, b)
-	if err != nil && prompt == "" {
-		// Fallback
-	} else if err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to get prompt for AreNotEqual: %w", err)
 	}
 
-	if prompt == "" { // Template was optional and not provided
-		areEqualResult, err := c.AreEqual(a, b)
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine AreNotEqual by inverting AreEqual: %w", err)
-		}
-		if areEqualResult == nil { // AreEqual returned undefined
-			return nil, nil
-		}
-		res := !(*areEqualResult)
-		return &res, nil
+	if prompt != "" { // Template was provided and prompt generated successfully
+		return c.query(prompt)
 	}
-	return c.query(prompt)
+
+	// Fallback: template was optional and not provided
+	areEqualResult, err := c.AreEqual(a, b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine AreNotEqual by inverting AreEqual: %w", err)
+	}
+	if areEqualResult == nil { // AreEqual returned undefined
+		return nil, nil
+	}
+	res := !(*areEqualResult)
+	return &res, nil
 }
 
 // IsGreaterThan checks if number 'a' is greater than number 'b'.
@@ -187,22 +190,22 @@ func (c *IsEvenAiCore) IsGreaterThan(a, b int) (*bool, error) {
 // If an 'isLessThan' prompt template is not provided, it derives the result by checking !IsGreaterThan(b,a).
 func (c *IsEvenAiCore) IsLessThan(a, b int) (*bool, error) {
 	prompt, err := c.getPrompt("isLessThan", a, b)
-	if err != nil && prompt == "" {
-		// Fallback
-	} else if err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to get prompt for IsLessThan: %w", err)
 	}
 
-	if prompt == "" { // Template was optional and not provided
-		isGreaterThanResult, err := c.IsGreaterThan(b, a) // Note: arguments are swapped
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine IsLessThan by inverting IsGreaterThan(b,a): %w", err)
-		}
-		if isGreaterThanResult == nil { // IsGreaterThan(b,a) returned undefined
-			return nil, nil
-		}
-		res := !(*isGreaterThanResult)
-		return &res, nil
+	if prompt != "" { // Template was provided and prompt generated successfully
+		return c.query(prompt)
 	}
-	return c.query(prompt)
+
+	// Fallback: template was optional and not provided
+	isGreaterThanResult, err := c.IsGreaterThan(b, a) // Note: arguments are swapped
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine IsLessThan by inverting IsGreaterThan(b,a): %w", err)
+	}
+	if isGreaterThanResult == nil { // IsGreaterThan(b,a) returned undefined
+		return nil, nil
+	}
+	res := !(*isGreaterThanResult)
+	return &res, nil
 }
